@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VF4 Menu Replica</title>
+<style>
+  body { margin:0; overflow:hidden; background:#0b0c11; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.161.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.161.0/examples/js/objects/Water2.js"></script>
+
+<script>
+  // --- Scene & Camera ---
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
+  camera.position.set(0, 15, 35);
+
+  const renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(window.devicePixelRatio); // crisp visuals
+  document.body.appendChild(renderer.domElement);
+
+  // --- Lighting ---
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+  scene.add(ambientLight);
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+  directionalLight.position.set(30,50,30);
+  scene.add(directionalLight);
+
+  // --- Water Plane ---
+  const waterGeometry = new THREE.PlaneGeometry(60, 60, 512, 512);
+  const water = new THREE.Water2(waterGeometry, {
+    color: 0x001e3c,
+    scale: 1,
+    flowDirection: new THREE.Vector2(1,1),
+    textureWidth: 1024,
+    textureHeight: 1024,
+  });
+  water.rotation.x = -Math.PI/2;
+  scene.add(water);
+
+  // --- Menu Panel ---
+  const textureLoader = new THREE.TextureLoader();
+  const metalTexture = textureLoader.load('https://i.ibb.co/8dJb2K6/metal-texture.jpg');
+  metalTexture.wrapS = metalTexture.wrapT = THREE.RepeatWrapping;
+  metalTexture.repeat.set(2,2);
+
+  const menuMaterial = new THREE.MeshStandardMaterial({ 
+    map: metalTexture, roughness:0.4, metalness:1
+  });
+
+  const menuGeometry = new THREE.BoxGeometry(10,15,1);
+  const menuMesh = new THREE.Mesh(menuGeometry, menuMaterial);
+  menuMesh.position.set(-15,7.5,0);
+  scene.add(menuMesh);
+
+  // --- LED Selector ---
+  const ledGeometry = new THREE.TorusGeometry(3,0.2,16,100);
+  const ledMaterial = new THREE.MeshStandardMaterial({color:0x4488ff, emissive:0x2244ff, metalness:0.5, roughness:0.2});
+  const ledMesh = new THREE.Mesh(ledGeometry, ledMaterial);
+  ledMesh.position.set(-15,13,1.2);
+  ledMesh.rotation.x=Math.PI/2;
+  scene.add(ledMesh);
+
+  // --- Buttons ---
+  const buttonLabels = ["HOME","2D","Cyber3D","Clients","Music","TheHolyMyth","Stream","Contact"];
+  const buttons = [];
+  const buttonGeometry = new THREE.BoxGeometry(8,1.2,0.6);
+
+  buttonLabels.forEach((label,i)=>{
+    const btnMaterial = new THREE.MeshStandardMaterial({color:0x1b2242, metalness:0.3, roughness:0.5, emissive:0x000000});
+    const btn = new THREE.Mesh(buttonGeometry, btnMaterial);
+    btn.position.set(-15, 13 - i*1.8, 0.8);
+    btn.userData = {label};
+    scene.add(btn);
+    buttons.push(btn);
+  });
+
+  // --- Raycaster for hover/click ---
+  const raycaster = new THREE.Raycaster();
+  const mouse = new THREE.Vector2();
+  let hoveredButton = null;
+
+  function onMouseMove(event){
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+  }
+
+  function onClick(event){
+    if(hoveredButton){
+      ledMesh.position.y = hoveredButton.position.y;
+      clickSound.play();
+    }
+  }
+
+  window.addEventListener('mousemove', onMouseMove);
+  window.addEventListener('click', onClick);
+
+  // --- Background ---
+  const bgGeometry = new THREE.PlaneGeometry(100,50);
+  const bgTexture = textureLoader.load('https://cdn.pixabay.com/photo/2023/07/14/12/16/woman-8127154_1280.jpg');
+  const bgMaterial = new THREE.MeshBasicMaterial({map:bgTexture});
+  const bgMesh = new THREE.Mesh(bgGeometry, bgMaterial);
+  bgMesh.position.set(20,25,-30);
+  scene.add(bgMesh);
+
+  // --- Controls ---
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableZoom=false;
+  controls.enablePan=false;
+  controls.target.set(0,7,0);
+
+  // --- Audio ---
+  const listener = new THREE.AudioListener();
+  camera.add(listener);
+
+  // Ambient Menu Music
+  const ambientMusic = new THREE.Audio(listener);
+  new THREE.AudioLoader().load('https://freesound.org/data/previews/501/501928_10226550-lq.mp3', buffer=>{
+    ambientMusic.setBuffer(buffer);
+    ambientMusic.setLoop(true);
+    ambientMusic.setVolume(0.25);
+    ambientMusic.play();
+  });
+
+  // Click Sound
+  const clickSound = new THREE.Audio(listener);
+  new THREE.AudioLoader().load('https://freesound.org/data/previews/170/170621_2437358-lq.mp3', buffer=>{
+    clickSound.setBuffer(buffer);
+    clickSound.setVolume(0.5);
+  });
+
+  // --- Animate ---
+  function animate(){
+    requestAnimationFrame(animate);
+    water.material.uniforms.time.value += 1.0/60.0;
+    ledMesh.rotation.z +=0.01;
+
+    // Hover effect
+    raycaster.setFromCamera(mouse,camera);
+    const intersects = raycaster.intersectObjects(buttons);
+    if(intersects.length>0){
+      if(hoveredButton !== intersects[0].object){
+        if(hoveredButton) hoveredButton.material.emissive.set(0x000000);
+        hoveredButton = intersects[0].object;
+        hoveredButton.material.emissive.set(0x2233ff);
+      }
+    } else {
+      if(hoveredButton) hoveredButton.material.emissive.set(0x000000);
+      hoveredButton = null;
+    }
+
+    renderer.render(scene,camera);
+  }
+  animate();
+
+  window.addEventListener('resize', ()=>{
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+</script>
+</body>
+</html>
