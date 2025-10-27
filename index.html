@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>VF4 Menu</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      height: 100%;
+      font-family: Arial, sans-serif;
+      background: #000;
+    }
+
+    #menu {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      z-index: 10;
+    }
+
+    .menu-button {
+      margin: 15px;
+      padding: 15px 40px;
+      font-size: 24px;
+      color: #fff;
+      background: url('metal-texture.jpg') repeat;
+      border: 2px solid #fff;
+      cursor: pointer;
+      transition: 0.2s;
+      text-align: center;
+    }
+
+    .menu-button:hover {
+      transform: scale(1.1);
+      border-color: #ff0;
+    }
+  </style>
+</head>
+<body>
+  <audio id="ambient" src="menu-ambient.mp3" autoplay loop></audio>
+
+  <div id="menu">
+    <div class="menu-button" onclick="playClick('Start')">Start Game</div>
+    <div class="menu-button" onclick="playClick('Options')">Options</div>
+    <div class="menu-button" onclick="playClick('Exit')">Exit</div>
+  </div>
+
+  <canvas id="bgCanvas"></canvas>
+
+  <audio id="clickSound" src="menu-click.mp3"></audio>
+
+  <script type="module">
+    import { Water } from './Water2.js';
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js';
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.1, 2000);
+    camera.position.set(0, 30, 100);
+
+    const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('bgCanvas') });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+
+    // Water
+    const waterGeometry = new THREE.PlaneGeometry(2000, 2000);
+
+    const water = new Water(
+      waterGeometry,
+      {
+        textureWidth: 512,
+        textureHeight: 512,
+        waterNormals: new THREE.TextureLoader().load('water-normals.jpg', function (texture) {
+          texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+        }),
+        alpha: 1.0,
+        sunDirection: new THREE.Vector3(),
+        sunColor: 0xffffff,
+        waterColor: 0x001e0f,
+        distortionScale: 3.7,
+      }
+    );
+
+    water.rotation.x = - Math.PI / 2;
+    scene.add(water);
+
+    // Background Image
+    const loader = new THREE.TextureLoader();
+    loader.load('background.jpg', function(texture){
+      scene.background = texture;
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      water.material.uniforms['time'].value += 1.0 / 60.0;
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Button click sound
+    function playClick(name) {
+      const click = document.getElementById('clickSound');
+      click.currentTime = 0;
+      click.play();
+      console.log(name + " clicked");
+    }
+  </script>
+</body>
+</html>
